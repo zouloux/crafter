@@ -12,7 +12,8 @@ if ( process.argv.length >= 4 && process.argv[1].split("/.bin/craft").length !==
 else {
 	nicePrint(`
 		{b/r}Invalid usage of craft
-		{d}Usage: {b/w}craft ./path/to-crafter.js ./src/to-app/
+		{d}Usage 1 : {b/w}craft ./path/to-crafter.js ./src/to-app/
+		{d}Usage 2 : {b/w}craft ./path/to-crafter.js ./src/to-app/ .env.optional
 	`, {
 		code: 1,
 	})

@@ -1,26 +1,78 @@
 
 
+// ----------------------------------------------------------------------------- TYPES
 
-//type Menu = Record<string, string>
+// Var bag for templating as { "key": "value" }
+import { askList, nicePrint } from "@zouloux/cli";
 
-interface ICrafter {
+export type TVars = Record<string, string|number|boolean>
 
+// Loaded env bag as { "key": "value" }
+export type TEnv = Record<string, string>
+
+// Craft step as ( vars ) => [ from, to ] or ( vars ) => void
+export type TStep <GVars extends TVars = TVars> = (vars:GVars) => void | [ string, string ]
+
+// Crafter function with vars as first argument and steps as second argument
+export type TCrafter<GVars extends TVars = TVars> = ( vars:GVars, steps:TStep[] ) => void
+
+// Craft action
+export type TCraftAction = ( crafter:TCrafter, crafterPath?:string, appPath?:string, env?:TEnv ) => Promise<void>
+
+interface ICraftAction {
+	id			:string,
+	menuEntry	:string
+	action		:TCraftAction
 }
 
-type TEnv = Record<string, string>
+type TCraftActions = {[id:string]:ICraftAction}
 
-type TCraftAction = ( crafter:ICrafter, env:TEnv ) => Promise<void>
+// ----------------------------------------------------------------------------- LOAD CRAFTER
 
-
-
-export async function loadCrafter ( crafterPath:string, appPath:string ) {
-	console.log( "loadCrafter", crafterPath, appPath )
-	const crafter = await import( crafterPath )
-	//console.log( crafter );
+function getCraftActions ():TCraftActions {
+	return global.__craftActions
 }
 
+// Load a crafter and its craft actions
+export async function loadCrafter ( crafterPath:string, appPath:string, actionID?:string ) {
+	// console.log( "loadCrafter", crafterPath, appPath, actionID )
+	global.__craftActions = {}
+	await import( crafterPath )
+	const craftActions = getCraftActions()
+	// console.log('Craft actions', craftActions);
+	if ( actionID ) {
+		if ( !(actionID in craftActions) )
+			nicePrint(`{b/r}Action with id ${actionID} not found in crafter ${crafterPath}`, { code: 4 })
+	}
+	else {
+		actionID = await showCrafterMenu( craftActions )
+	}
+	executeCrafterAction( craftActions[ actionID ] )
+	global.__craftActions = null;
+}
+
+async function showCrafterMenu ( craftActions:TCraftActions ) {
+	let menu = {}
+	for ( const key in craftActions )
+		menu[ key ] = craftActions[ key ].menuEntry
+	return await askList('What do you want to craft ?', menu, { returnType: 'key' })
+}
+
+function executeCrafterAction ( action:ICraftAction ) {
+	console.log("> executeCrafterAction", action)
+
+	// TODO : J'en suis là
+}
+
+// ----------------------------------------------------------------------------- LOAD CREATE CRAFT ACTION
+
+// Creat a craft action from within the crafter
 export function createCraftAction ( id:string, menuEntry:string, action:TCraftAction ) {
-
+	if ( !global.__craftActions )
+		nicePrint(`{b/r}Please use createCraftAction only in a crafter`, { code: 2 })
+	if ( id in global.__craftActions )
+		nicePrint(`{b/r}Craft action with id ${id} already exists`, { code: 3 })
+	global.__craftActions[ id ] = { id, menuEntry, action } as ICraftAction
 }
 
 /*
