@@ -1,10 +1,39 @@
 
 
-export function loadCrafter ( crafterPath:string ) {
-	console.log("loadCrafter", crafterPath)
+
+//type Menu = Record<string, string>
+
+interface ICrafter {
+
 }
 
+type TEnv = Record<string, string>
 
+type TCraftAction = ( crafter:ICrafter, env:TEnv ) => Promise<void>
+
+
+
+export async function loadCrafter ( crafterPath:string, appPath:string ) {
+	console.log( "loadCrafter", crafterPath, appPath )
+	const crafter = await import( crafterPath )
+	//console.log( crafter );
+}
+
+export function createCraftAction ( id:string, menuEntry:string, action:TCraftAction ) {
+
+}
+
+/*
+let currentFileName
+// @ts-ignore
+if ( typeof import.meta < "u")
+	// @ts-ignore
+	currentFileName = import.meta.url
+// @ts-ignore
+else if ( __filename )
+	// @ts-ignore
+	currentFileName = __filename
+*/
 
 
 

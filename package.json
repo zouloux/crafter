@@ -1,19 +1,18 @@
 {
   "name": "@zouloux/crafter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scaffold code quickly from CLI",
   "type": "module",
-  "main": "./dist/crafter.js",
+  "main": "./dist/crafter.es2019.cjs",
   "module": "./dist/crafter.es2022.mjs",
   "types": "./dist/crafter.d.ts",
   "bin": {
     "craft": "./dist/cli.es2022.mjs",
-    "crafter": "./dist/cli.es2022.mjs",
     "craft-cjs": "./dist/cli.es2019.cjs"
   },
   "scripts": {
     "reset": "rm -rf node_modules package-lock.json && npm i",
-    "build": "tsbundle build",
+    "build": "tsbundle build && chmod -R +x ./dist",
     "clean": "tsbundle clean",
     "publish": "tsbundle publish"
   },

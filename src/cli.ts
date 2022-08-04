@@ -1,8 +1,19 @@
-import { CLICommands } from "@zouloux/cli";
-import { loadCrafter } from "./crafter"
+#!/usr/bin/env node
 
-CLICommands.start((commandName, error, cliArguments, cliOptions, results) => {
-	console.log("START", commandName, error, cliArguments, cliOptions, results)
+import * as path from "path";
+import { loadCrafter } from "./crafter";
+import { nicePrint } from "@zouloux/cli";
 
-	loadCrafter(" ")
-})
+if ( process.argv.length >= 4 && process.argv[1].split("/.bin/craft").length !== 0 ) {
+	const crafterPath = path.join( process.cwd(), process.argv[2] )
+	const appPath = path.join( process.cwd(), process.argv[3] )
+	loadCrafter( crafterPath, appPath )
+}
+else {
+	nicePrint(`
+		{b/r}Invalid usage of craft
+		{d}Usage: {b/w}craft ./path/to-crafter.js ./src/to-app/
+	`, {
+		code: 1,
+	})
+}
