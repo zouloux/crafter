@@ -1,0 +1,56 @@
+{
+  "name": "@zouloux/crafter",
+  "version": "0.1.0",
+  "description": "Scaffold code quickly from CLI",
+  "type": "module",
+  "main": "./dist/crafter.js",
+  "module": "./dist/crafter.es2022.mjs",
+  "types": "./dist/crafter.d.ts",
+  "bin": {
+    "craft": "./dist/cli.es2022.mjs",
+    "crafter": "./dist/cli.es2022.mjs",
+    "craft-cjs": "./dist/cli.es2019.cjs"
+  },
+  "scripts": {
+    "reset": "rm -rf node_modules package-lock.json && npm i",
+    "build": "tsbundle build",
+    "clean": "tsbundle clean",
+    "publish": "tsbundle publish"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zouloux/crafter.git"
+  },
+  "keywords": [
+    "scaffolder",
+    "craft",
+    "crafter"
+  ],
+  "author": "Alexis Bouhet - ZoulouX",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/zouloux/crafter/issues"
+  },
+  "homepage": "https://github.com/zouloux/crafter#readme",
+  "dependencies": {
+    "@zouloux/cli": "^0.1.7",
+    "@zouloux/ecma-core": "^0.2.0",
+    "@zouloux/files": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.6.3",
+    "@zouloux/tsbundle": "^1.3.1"
+  },
+  "tsbundle": {
+    "output": "./dist/",
+    "formats": [
+      "es2022.mjs",
+      "es2019.cjs"
+    ],
+    "files": [
+      {
+        "input": "./src/cli.ts"
+      }
+    ]
+  }
+}

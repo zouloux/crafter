@@ -1,0 +1,7 @@
+.DS_Store
+.idea
+src/
+LICENSE
+README.md
+tsconfig.json
+bits/
