@@ -140,3 +140,12 @@ cd examples/simple
 npm i
 npm run craft
 ```
+
+### Legacy module loading
+
+In case you have this error 
+`(node:56647) Warning: To load an ES module, set "type": "module" in the package.json or use the .mjs extension.`
+
+Add `"type": "module"` to your `package.json`
+
+If this is not possible, use `craft-legacy` instead of `craft` in your `package.json` scripts.

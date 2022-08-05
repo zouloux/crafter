@@ -1,6 +1,6 @@
 {
   "name": "@zouloux/crafter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Scaffold code quickly from CLI",
   "type": "module",
   "main": "./dist/crafter.es2019.cjs",
@@ -8,7 +8,7 @@
   "types": "./dist/crafter.d.ts",
   "bin": {
     "craft": "./dist/cli.es2022.mjs",
-    "craft-cjs": "./dist/cli.es2019.cjs"
+    "craft-legacy": "./dist/cli.es2019.cjs"
   },
   "scripts": {
     "reset": "rm -rf node_modules package-lock.json && npm i",
