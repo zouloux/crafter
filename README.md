@@ -1,6 +1,6 @@
 # crafter
 
-Crafter is configurable and powerful file scaffolder.
+Crafter is configurable and powerful file scaffolder written in Node.
 It can scaffold pretty much any ASCII file.
 
 Crafter is based on :
@@ -8,6 +8,8 @@ Crafter is based on :
 - [@zouloux/cli](https://github/zouloux/cli) to ask questions
 - [@zouloux/files](https://github/zouloux/files) for file manipulations
 - [stach](https://github/zouloux/stach) for templating
+
+![](./crafter-screencap.gif)
 
 ### Install
 
