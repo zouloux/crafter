@@ -1,0 +1,14 @@
+{
+  "name": "simple-crafter-example",
+  "version": "1.0.0",
+  "description": "A simple crafter demo",
+  "type": "module",
+  "scripts": {
+    "craft" : "craft ./demo-crafter/demo-crafter.js ./src/"
+  },
+  "devDependencies": {
+    "@zouloux/crafter": "^0.1.2"
+  },
+  "author": "Alexis Bouhet - ZoulouX",
+  "license": "MIT"
+}

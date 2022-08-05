@@ -1,0 +1,16 @@
+import { h, DefaultReflexProps } from "@zouloux/reflex";
+import S from "./{{Name}}.module.less"
+import gsap from "gsap";
+
+interface Props extends DefaultReflexProps {
+
+}
+
+export function {{Name}} ( props:Props )
+{
+    // ------------------------------------------------------------------------- RENDER
+
+    return () => <div class={[ S.{{Name}} ]}>
+        {{Name}}
+	</div>
+}

@@ -1,10 +1,10 @@
-
+import { askList, nicePrint, oraTask } from "@zouloux/cli";
+import { File, FileFinder } from "@zouloux/files";
+import * as path from "path";
 
 // ----------------------------------------------------------------------------- TYPES
 
 // Var bag for templating as { "key": "value" }
-import { askList, nicePrint } from "@zouloux/cli";
-
 export type TVars = Record<string, string|number|boolean>
 
 // Loaded env bag as { "key": "value" }
@@ -14,27 +14,34 @@ export type TEnv = Record<string, string>
 export type TStep <GVars extends TVars = TVars> = (vars:GVars) => void | [ string, string ]
 
 // Crafter function with vars as first argument and steps as second argument
-export type TCrafter<GVars extends TVars = TVars> = ( vars:GVars, steps:TStep[] ) => void
+export type TCrafter<GVars extends TVars = TVars> = ( vars:GVars, steps:TStep[] ) => void|Promise<void>
 
-// Craft action
-export type TCraftAction = ( crafter:TCrafter, crafterPath?:string, appPath?:string, env?:TEnv ) => Promise<void>
+// Craft action function
+export type TCraftActionFunction = ( crafter:TCrafter, crafterRoot?:string, appPath?:string, env?:TEnv ) => Promise<void>
 
-interface ICraftAction {
+// Craft action item
+interface ICraftActionItem {
 	id			:string,
 	menuEntry	:string
-	action		:TCraftAction
+	action		:TCraftActionFunction
 }
 
-type TCraftActions = {[id:string]:ICraftAction}
+// List of craft action items in a record
+type TCraftActionItems = {[id:string]:ICraftActionItem}
 
 // ----------------------------------------------------------------------------- LOAD CRAFTER
 
-function getCraftActions ():TCraftActions {
+// Get last registered craft action items
+function getCraftActions ():TCraftActionItems {
+	// We use global because crafter module can have multiple instances
 	return global.__craftActions
 }
 
 // Load a crafter and its craft actions
 export async function loadCrafter ( crafterPath:string, appPath:string, actionID?:string ) {
+	// Add index.js if we are on a directory
+	if ( !path.parse( crafterPath ).ext )
+		crafterPath = path.join( crafterPath, 'index.js' )
 	// console.log( "loadCrafter", crafterPath, appPath, actionID )
 	global.__craftActions = {}
 	await import( crafterPath )
@@ -47,274 +54,84 @@ export async function loadCrafter ( crafterPath:string, appPath:string, actionID
 	else {
 		actionID = await showCrafterMenu( craftActions )
 	}
-	executeCrafterAction( craftActions[ actionID ] )
+	// Load dot env
+	// TODO : Add parameter to be able to load custom .env
+	const dotEnvPath = path.join( process.cwd(), ".env" )
+	const dotEnvFile = new File( dotEnvPath )
+	let env:TEnv = {}
+	if ( await dotEnvFile.exists() ) {
+		await dotEnvFile.load()
+		env = await dotEnvFile.dotEnv() as TEnv
+	}
+	// Target crafter root
+	const crafterRoot = path.dirname( crafterPath )
+	await executeCrafterAction( craftActions[ actionID ], crafterRoot, appPath, env )
 	global.__craftActions = null;
 }
 
-async function showCrafterMenu ( craftActions:TCraftActions ) {
+async function showCrafterMenu ( craftActions:TCraftActionItems ) {
 	let menu = {}
 	for ( const key in craftActions )
 		menu[ key ] = craftActions[ key ].menuEntry
 	return await askList('What do you want to craft ?', menu, { returnType: 'key' })
 }
 
-function executeCrafterAction ( action:ICraftAction ) {
-	console.log("> executeCrafterAction", action)
-
-	// TODO : J'en suis là
+async function executeCrafterAction ( action:ICraftActionItem, crafterRoot:string, appPath:string, env:TEnv ) {
+	//console.log("> executeCrafterAction", action)
+	const localCrafter:TCrafter = async ( vars:TVars, steps:TStep[] ) => {
+		await oraTask(`Generating files`, async ( task ) => {
+			// Browse steps to execute
+			const generatedSteps = []
+			let stepIndex = 0;
+			const totalStep = steps.length - 1
+			for ( const step of steps ) {
+				task.setProgress( stepIndex ++, totalStep )
+				try {
+					// Execute crafter step
+					const fileReturn = await step( vars )
+					// Check return type, if it's not a tuple
+					if ( !Array.isArray(fileReturn) || fileReturn.length !== 2 ) {
+						generatedSteps.push('')
+						continue;
+					}
+					// Get from path and to path
+					let [ from, to ] = fileReturn
+					from = path.join( crafterRoot, from )
+					to = path.join( appPath, to )
+					// Check if crafter file exists
+					if ( !(await FileFinder.exists( from )) )
+						task.error(`Crafter file ${from} does not exists`)
+					// Check if to path is not already existing and halt if it does
+					if ( await FileFinder.exists( to ) )
+						task.error(`File ${to} already exists`)
+					// Target template file from crafter
+					const templateFile = new File( from )
+					await templateFile.load()
+					// Template from path with properties and save it to path
+					templateFile.template( vars )
+					await templateFile.save( to )
+					generatedSteps.push( to )
+				}
+				catch ( e ) {
+					task.error(`Fatal error while executing step ${stepIndex - 1} on crafter "${action.id}".`)
+					nicePrint( `{b/r}${e.stack}` )
+					process.exit( 10 );
+				}
+			}
+			const t = generatedSteps.length
+			task.success(`${t} file${t > 1 ? 's' : ''} generated.`)
+		})
+	}
+	await action.action( localCrafter, crafterRoot, appPath, env )
 }
 
 // ----------------------------------------------------------------------------- LOAD CREATE CRAFT ACTION
 
 // Creat a craft action from within the crafter
-export function createCraftAction ( id:string, menuEntry:string, action:TCraftAction ) {
+export function createCraftAction ( id:string, menuEntry:string, action:TCraftActionFunction ) {
 	if ( !global.__craftActions )
 		nicePrint(`{b/r}Please use createCraftAction only in a crafter`, { code: 2 })
 	if ( id in global.__craftActions )
 		nicePrint(`{b/r}Craft action with id ${id} already exists`, { code: 3 })
-	global.__craftActions[ id ] = { id, menuEntry, action } as ICraftAction
+	global.__craftActions[ id ] = { id, menuEntry, action } as ICraftActionItem
 }
-
-/*
-let currentFileName
-// @ts-ignore
-if ( typeof import.meta < "u")
-	// @ts-ignore
-	currentFileName = import.meta.url
-// @ts-ignore
-else if ( __filename )
-	// @ts-ignore
-	currentFileName = __filename
-*/
-
-
-
-/*
-function craft = async <G extends object> ( crafterPath:string, properties:G, files:( (p:G, crafterPath?:string) => string[]|Promise<any>|void)[], appOptions?:IExtendedAppOptions ) =>
-{
-	const generateLoader = printLoaderLine(`Generating files ...`)
-
-	// Get app options
-	if ( !appOptions )
-		this.halt('halt', `{r}AppOptions parameter missing`)
-
-	// Browse files to generate
-	const generatedFiles = []
-	for ( const file of files )
-	{
-		// Execute crafter file
-		const fileReturn = await file( properties, crafterPath )
-
-		// Check return type, if its not a tuple
-		if (
-			// Void
-			!fileReturn
-			// Promise
-			|| fileReturn instanceof Promise
-			// Array but not a tuple
-			|| (Array.isArray(fileReturn) && fileReturn.length != 2)
-		) {
-			generatedFiles.push('')
-			continue;
-		}
-
-		// Get from path and to path
-		const [ from, to ] = fileReturn
-
-		// Check if to path is not already existing
-		if ( File.find(to).length != 0 )
-			this.halt('craft', `File ${to} already exists`)
-
-		// Target template file from crafter
-		const templateFile = new File( path.join(crafterPath, from) )
-		await templateFile.loadAsync()
-		if (!(await templateFile.existsAsync()))
-			this.halt('craft', `Template ${from} not found relatively to ${crafterPath}`)
-
-		// Template from path with properties and save it to to path
-		templateFile.template( properties )
-		await templateFile.saveAsync( path.join(appOptions.packageRoot, to) )
-		generatedFiles.push( to )
-	}
-
-	// Finished
-	const t = generatedFiles.length
-	generateLoader(`{g/b}${t} file${t > 1 ? 's' : ''} generated.`)
-	return generatedFiles;
-}*/
-
-
-
-/*
-import { IBaseSolidPluginConfig, ICommand, SolidPlugin } from "../../engine/SolidPlugin";
-import { IExtendedAppOptions, SolidParcel } from "../../engine/SolidParcel";
-import { File } from "@solid-js/files"
-import { askList, CLICommands, printLoaderLine } from "@solid-js/cli";
-import { removeExtensions } from "@solid-js/core";
-const path = require('path')
-
-/!**
- * TODO : V1.1
- * - Demander sur quelle app partir si on a plusieurs plugins craft
- * - Activer les commandes pour controller le tout
- *    solid craft preact component AppView --app reem
- *!/
-
-/!**
- * TODO : V1.2
- * - Crafter file name can be in config
- * - Better types in crafter.js file, how to do that ?
- * - Add option to craft outside of package root ?
- * - Create crafter repo with :
- *    - Solid Preact
- *    - Solid Yadl
- *    - Solid Fastify
- *    - Solid plate fields for WP ACF Field files ?
- *!/
-
-// -----------------------------------------------------------------------------
-
-interface ISolidCraftPluginConfig extends IBaseSolidPluginConfig
-{
-	paths			:string[]
-	templateProps	?:object
-	exposeCommand	?:string|false
-}
-
-const _defaultConfig:Partial<ISolidCraftPluginConfig> = {
-	templateProps	: {},
-	exposeCommand	: 'craft'
-}
-
-interface ICrafterModuleInit
-{
-	name : string
-	menu : {
-		[index:string] : string
-	}
-	_crafterPath ?:string
-}
-interface ICrafterModuleMethods
-{
-	[index:string] : ( craft, appOptions:IExtendedAppOptions ) => any
-}
-type TCrafterModule = ( ICrafterModuleInit & ICrafterModuleMethods )
-
-// ----------------------------------------------------------------------------- CONFIG
-
-const _crafterFile = 'crafter.js'
-
-// ----------------------------------------------------------------------------- PLUGIN CLASS
-
-export class SolidCraftPlugin extends SolidPlugin <ISolidCraftPluginConfig>
-{
-	static init ( config:ISolidCraftPluginConfig ) {
-		return new SolidCraftPlugin({ name: 'craft', ..._defaultConfig, ...config })
-	}
-
-	// If we already init cli craft command
-	static __cliCommandInit = false
-
-	// List of available crafters
-	protected _crafters : { [name:string] : TCrafterModule };
-
-	// ------------------------------------------------------------------------- INIT
-
-	init ()
-	{
-		// Class bug ? Need to init here ...
-		if (!this._crafters)
-			this._crafters = {}
-
-		// No crafter paths
-		if ( !this._config.paths || this._config.paths.length == 0 )
-			this.halt('init', `{r}Please add path(s) to crafter file(s).`)
-
-		// Browse all crafters paths and register them
-		this._config.paths.map( craftPath => {
-			// Path to crafter file, from cwd
-			const pathToCraftFile = path.join( craftPath, _crafterFile )
-			const craftFiles = File.find( pathToCraftFile )
-
-			// File not found
-			if ( craftFiles.length == 0 )
-				this.halt('init', `{r}Crafter file {b/r}${ pathToCraftFile }{/}{r} not found.`)
-
-			// Path to crafter module (from root, for require)
-			const crafterModulePath = removeExtensions(path.join(process.cwd(), pathToCraftFile))
-			const crafterModule = require( crafterModulePath )
-
-			// Check if we have a name
-			if ( typeof crafterModule.name !== 'string')
-				this.halt('init', `{r}Crafter module {b/r}${ pathToCraftFile }{/}{r} invalid.
-				{r}Missing {b/r}name{/}{r} export as string.`)
-
-			// Check if we have a menu
-			if ( typeof crafterModule.menu !== 'object')
-				this.halt('init', `{r}Crafter module {b/r}${ pathToCraftFile }{/}{r} invalid.
-				{r}Missing {b/r}menu{/}{r} export as an object.`)
-
-			// Save crafter directory so it can target templates relatively
-			crafterModule._crafterPath = path.dirname(pathToCraftFile)
-
-			// Register crafter by its name
-			this._crafters[ crafterModule.name ] = crafterModule;
-		})
-
-		// Expose CLI Command
-		// (only once if we have several apps)
-		if ( SolidCraftPlugin.__cliCommandInit || this._config.exposeCommand === false ) return
-		SolidCraftPlugin.__cliCommandInit = true
-		CLICommands.add(this._config.exposeCommand, async ( args, options ) => {
-			const parameters = {
-				crafter: args[0] ?? null,
-			}
-			await SolidParcel.action('craft', parameters, options.app)
-		}, { app: null })
-	}
-
-	// ------------------------------------------------------------------------- CRAFT ACTION
-
-	async action ( command:ICommand, appOptions?:IExtendedAppOptions )
-	{
-		if ( command.command != 'craft' ) return
-
-		const crafterKeys = Object.keys( this._crafters )
-		const crafterName = (command.parameters['crafter'] as string ?? '')
-
-		// Only one crafter, select it
-		let selectedCrafter:TCrafterModule;
-		if ( crafterKeys.length == 1 )
-			selectedCrafter = this._crafters[ crafterKeys[0] ]
-
-		// Get crafter from parameters
-		else if ( crafterName in this._crafters )
-			selectedCrafter = this._crafters[ crafterName ]
-
-		// Crafter not found, ask which to select
-		if ( !selectedCrafter ) {
-			const crafterChoice = await askList( 'Which crafter  ?', crafterKeys )
-			selectedCrafter = this._crafters[ crafterChoice[1] ]
-		}
-
-		// Show crafter menu
-		const craftEntity = await askList('What do you want to craft ?', selectedCrafter.menu)
-
-		// Thunk craft to add some parameters from this scope
-		const craftThunk = ( properties, files ) => {
-			this.craft( selectedCrafter._crafterPath, properties, files, appOptions )
-		}
-		await selectedCrafter[ craftEntity[2] ]( craftThunk, appOptions )
-	}
-
-	/!**
-	 * Craft list of files from templates
-	 * @param crafterPath Path to crafter directory so it can load template relatively
-	 * @param properties Properties injected into template sources
-	 * @param files List of function which returns template source and generated file destination.
-	 * 				Template path starts from crafter file.
-	 * 				File destination starts from app packageRoot (@see IAppOptions doc)
-	 * @param appOptions App options of current crafted app.
-	 *!/
-
-}*/
